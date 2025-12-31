@@ -56,10 +56,10 @@
             LIFF_ID: "2008400942-nm4l6zlp",
             OFFICIAL_LINE_URL: "https://lin.ee/LTFdIJo",
             
-            // [資料軌] 房價資料 Webhook (有快取機制，每天更新一次)
+            // [資料軌] 房價資料 Webhook
             N8N_WEBHOOK_URL: "https://ez2.zeabur.app/webhook/650159db-37eb-4bfe-9aa1-01bed4d5b989",
             
-            // [權限軌] 付費驗證 Webhook (無快取，每次開啟 APP 強制檢查)
+            // [權限軌] 付費驗證 Webhook
             N8N_AUTH_URL: "https://ez2.zeabur.app/webhook/9af46c08-96e8-4c13-82a4-7e8339a656c8954", 
             
             // [功能] 開啟通知
@@ -357,7 +357,7 @@
         };
 
         // --- UI Components ---
-        // [修改] Header 現在接受 onOpenProModal 和 isPaidUser 狀態
+        // Header 現在接受 onOpenProModal 和 isPaidUser 狀態
         const Header = memo(({ onOpenCitySelector, onOpenProModal, isPaidUser }) => (
             <div className="px-4 py-3 bg-white flex-none flex items-center justify-between shadow-sm z-20 relative">
                 <button 
@@ -435,7 +435,7 @@
             </div>
         ));
 
-        // [新增] FeedbackModal - 處理結果回饋彈窗
+        // FeedbackModal - 處理結果回饋彈窗
         const FeedbackModal = memo(({ onClose, message, type }) => (
             <div className="fixed inset-0 z-[70] bg-black/60 backdrop-blur-sm flex items-center justify-center animate-fade-in p-4">
                 <div className="bg-white w-full max-w-sm rounded-2xl relative z-10 p-6 shadow-2xl animate-fade-in-up flex flex-col items-center text-center">
@@ -451,7 +451,7 @@
             </div>
         ));
 
-        // [新增] MonitorModal - 付費會員專用設定表單
+        // MonitorModal - 付費會員專用設定表單
         const MonitorModal = memo(({ onClose, onEnable, onDisableAll, cities, initialCityId, initialDate }) => {
             const [selectedMonitorCity, setSelectedMonitorCity] = useState(initialCityId || cities[0].id);
             const [selectedStartDate, setSelectedStartDate] = useState(initialDate || new Date().toISOString().split('T')[0]);
@@ -491,9 +491,9 @@
                                         onChange={(e) => setSelectedMonitorCity(e.target.value)}
                                         className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800 font-medium"
                                     >
-                                        {cities.map(city => (
-                                            <option key={city.id} value={city.id}>{city.name}</option>
-                                        ))}
+                                            {cities.map(city => (
+                                                <option key={city.id} value={city.id}>{city.name}</option>
+                                            ))}
                                     </select>
                                     <ChevronDown className="absolute right-3 top-3.5 text-gray-400 pointer-events-none" size={20} />
                                 </div>
@@ -588,7 +588,7 @@
 
             return (
                 <div className="px-2 mb-6 space-y-3">
-                     <a 
+                      <a 
                         href={displayAgodaUrl} 
                         target="_blank" 
                         rel="noopener noreferrer" 
@@ -827,12 +827,20 @@
                             await liff.init({ liffId: CONFIG.LIFF_ID });
 
                             // === [新增] 來源檢查重導向 ===
+                            // 邏輯：若非在 LINE App 內，且來源不是 liff.line.me (LIFF跳轉) 或 access.line.me (登入跳轉)
+                            // 則視為直接開啟，導向行銷頁
                             const isLineClient = liff.isInClient();
                             const referrer = document.referrer || "";
+                            
+                            // 檢查是否為 LIFF 或 Login 流程
                             const isValidSource = referrer.includes("liff.line.me") || referrer.includes("access.line.me");
+                            
+                            // 檢查是否已登入 (若已登入通常代表是合法 Session，可允許重新整理)
                             const isLoggedIn = liff.isLoggedIn();
 
                             if (!isLineClient && !isValidSource && !isLoggedIn) {
+                                // 為了避免誤判開發環境(localhost)，通常會加 location.hostname !== 'localhost'
+                                // 但依照用戶需求，直接執行跳轉
                                 if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
                                      window.location.href = "https://tahokkaido.com/line-friend/";
                                      return; // 中斷後續執行
@@ -979,15 +987,15 @@
                             if (apiResponse.length > 0 && apiResponse[0].calendar) {
                                 rawCalendarData = apiResponse[0].calendar || [];
                                 
-                                // === 修正部分：處理 prices 巢狀陣列 ===
-                                const pricesData = apiResponse[0].prices || [];
-                                // 如果 prices 的第一項也是陣列 (例如 [[...]])，則取第一項，或使用 flat() 攤平
-                                if (pricesData.length > 0 && Array.isArray(pricesData[0])) {
-                                    rawPriceData = pricesData.flat();
+                                // [修正邏輯] 判斷 prices 是否為巢狀陣列 [[{...}]] 並進行攤平
+                                const incomingPrices = apiResponse[0].prices || [];
+                                if (Array.isArray(incomingPrices) && incomingPrices.length > 0 && Array.isArray(incomingPrices[0])) {
+                                    // 新版結構：prices 是一個包含陣列的陣列
+                                    rawPriceData = incomingPrices[0];
                                 } else {
-                                    rawPriceData = pricesData;
+                                    // 舊版結構或 Fallback：prices 直接是物件陣列
+                                    rawPriceData = incomingPrices;
                                 }
-                                // ===================================
 
                                 fetchedInsights = apiResponse[0].insights || null;
                             } else {
